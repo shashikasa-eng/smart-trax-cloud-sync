@@ -22,7 +22,7 @@ def main():
         page = context.new_page()
 
         print("🔑 Navigating to URL...")
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        page.goto(url, wait_until="networkidle", timeout=60000)
 
         # Login Check
         if "login" in page.url.lower() or page.locator("input[type='password']").count() > 0:
@@ -40,29 +40,42 @@ def main():
 
         print("✅ Login completed. Waiting for Dashboard data to load...")
         
-        # JS Render වීම සඳහා තත්පර 10ක් රඳවා ගැනීම
-        page.wait_for_timeout(10000)
+        # JS rendered elements සඳහා තත්පර 12ක් රැඳී සිටීම
+        page.wait_for_timeout(12000)
 
-        # Table එක DOM එකට Attached වන තෙක් තත්පර 60ක් දක්වා රැඳී සිටීම
-        try:
-            page.wait_for_selector("table", state="attached", timeout=60000)
-        except Exception as e:
-            print("⚠️ Notice: Table state check timeout, proceeding to extract available content...")
-
-        # Table එකේ Rows ලබා ගැනීම
-        rows = page.locator("table tr").all()
+        # පිටුවේ ඇති සියලුම Visible Tables සෙවීම
+        tables = page.locator("table:visible").all()
         table_data = []
+        best_table_rows = []
 
-        for row in rows:
-            cells = row.locator("th, td").all()
-            row_vals = [cell.inner_text().strip() for cell in cells]
-            if any(row_vals):
-                table_data.append(row_vals)
+        if tables:
+            # වඩාත්ම Rows ගණනක් ඇති Main Data Table එක පමණක් තෝරාගැනීම
+            max_rows = 0
+            for t in tables:
+                rows = t.locator("tr").all()
+                if len(rows) > max_rows:
+                    max_rows = len(rows)
+                    best_table_rows = rows
+
+            for row in best_table_rows:
+                cells = row.locator("th, td").all()
+                row_vals = [cell.inner_text().strip() for cell in cells]
+                if any(row_vals):
+                    table_data.append(row_vals)
+
+        # Custom Data Grids (DIV based tables) සඳහා Fallback එකක්
+        if not table_data:
+            grid_rows = page.locator("div[role='row']:visible, .v-data-table tr:visible").all()
+            for row in grid_rows:
+                cells = row.locator("div[role='gridcell'], div[role='columnheader'], td, th").all()
+                row_vals = [cell.inner_text().strip() for cell in cells]
+                if any(row_vals):
+                    table_data.append(row_vals)
 
         print(f"📊 Extracted {len(table_data)} rows of data.")
 
         if not table_data:
-            print("❌ No table data found on page!")
+            print("❌ No main table data found on page!")
             return
 
         # Google Sheets Sync
