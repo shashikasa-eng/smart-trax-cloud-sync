@@ -4,16 +4,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
-# 🎯 Targeted QIDs List (Total 35 QIDs)
-TARGET_QIDS = [
-    "K20748", "K20750", "K20752", "K20753", "K20754", "K20755", 
-    "K20830", "K20831", "K20893", "K20818", "K16793", "K3777", 
-    "K3129", "K4874", "K18603", "K18637", "K19747", "K19751", 
-    "K19754", "K19757", "K20684", "K13227", "K21002", "K21004", 
-    "K20232", "K20235", "K20242", "K20119", "K20120", "K20122", 
-    "K16260", "K17205", "K20524", "K20896", "K18417"
-]
-
 def main():
     url = os.environ.get("SMART_URL")
     username = os.environ.get("SMART_USERNAME")
@@ -24,14 +14,14 @@ def main():
     if not all([url, username, password, sheet_name, creds_json]):
         raise Exception("Missing required environment variables in GitHub Secrets!")
 
-    print(f"🚀 Starting Targeted QID Scraper for {len(TARGET_QIDS)} Users...")
+    print("🚀 Starting Complete Universal Dashboard Scraper (Full Dynamic Engine)...")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={'width': 1920, 'height': 1080})
         page = context.new_page()
 
-        print("🔑 Navigating to URL...")
+        print("🔑 Navigating to SMART Dashboard URL...")
         page.goto(url, wait_until="networkidle", timeout=60000)
 
         # Login Handling
@@ -48,95 +38,88 @@ def main():
             page.keyboard.press("Enter")
             page.wait_for_timeout(10000)
 
-        print("✅ Login completed. Waiting for Dashboard...")
-        page.wait_for_timeout(10000)
+        print("✅ Login completed. Waiting for Dashboard PowerBI/DataGrid elements to populate...")
+        page.wait_for_timeout(12000)
+
+        # ----------------------------------------------------------------------
+        # 📜 INNER TABLE VIRTUAL SCROLLING ENGINE (All Rows Capture)
+        # ----------------------------------------------------------------------
+        print("📜 Activating Inner Table Virtual Scrollbar to load ALL QAT Rows...")
 
         table_data = []
-        found_qids = set()
-
-        # ----------------------------------------------------------------------
-        # 🔍 SEARCH / FILTER LOGIC PER QID
-        # ----------------------------------------------------------------------
-        search_box = page.locator("input[type='search'], input[placeholder*='Search'], input[aria-label*='Search']").first
         
-        if search_box.is_visible():
-            print("🎯 Search Box detected! Searching each QID directly...")
-            for qid in TARGET_QIDS:
-                try:
-                    search_box.fill("")
-                    search_box.fill(qid)
-                    page.keyboard.press("Enter")
-                    page.wait_for_timeout(2000)
+        # PowerBI / Grid Containers & Tables detection
+        grid_selector = "div[role='grid'], .v-data-table, table, div[class*='scroll']"
+        
+        # Get Column Headers
+        header_cells = page.locator("th, div[role='columnheader']").all()
+        if header_cells:
+            headers = [h.inner_text().strip().replace('\n', ' ') for h in header_cells if h.inner_text().strip()]
+            if headers and headers not in table_data:
+                table_data.append(headers)
 
-                    rows = page.locator("table:visible tr, div[role='row']:visible").all()
-                    for r in rows:
-                        cells = r.locator("td, th, div[role='gridcell']").all()
-                        row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
-                        if any(qid.lower() in v.lower() for v in row_vals):
-                            if row_vals not in table_data:
-                                table_data.append(row_vals)
-                                found_qids.add(qid.upper())
-                                print(f"✅ Found record for QID: {qid}")
-                except Exception as ex:
-                    print(f"⚠️ Search error for {qid}: {ex}")
-        else:
-            print("📜 Search box not found. Performing full pagination and QID matching...")
+        # Inner Scroll loop to trigger virtual row rendering
+        scroll_container = page.locator(grid_selector).first
+        
+        previous_row_count = 0
+        scroll_attempts = 0
+        max_attempts = 35  # Continuous inner scrolling
+
+        while scroll_attempts < max_attempts:
+            # Table එකේ පේන සෑම Row එකක්ම Scan කර ගැනීම
+            rows = page.locator("tr, div[role='row']").all()
             
-            # Smooth Scroll
-            for _ in range(6):
+            for row in rows:
+                cells = row.locator("td, th, div[role='gridcell']").all()
+                row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
+                
+                # Non-empty dynamic row validation
+                if any(row_vals) and len(row_vals) > 2:
+                    if row_vals not in table_data:
+                        table_data.append(row_vals)
+
+            # Inner Container එක පල්ලෙහාට Scroll කිරීම (Mouse Wheel & JavaScript)
+            if scroll_container.is_visible():
+                scroll_container.hover()
+                page.mouse.wheel(0, 1500)
+            else:
                 page.evaluate("window.scrollBy(0, 1000)")
-                page.wait_for_timeout(1000)
 
-            page_num = 1
-            while True:
-                rows = page.locator("table:visible tr, div[role='row']:visible").all()
-                for r in rows:
-                    cells = r.locator("td, th, div[role='gridcell']").all()
-                    row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
-                    if any(row_vals):
-                        row_text = " ".join(row_vals).upper()
-                        # Header row එකක් නම් ඇතුළත් කරගනී
-                        if page_num == 1 and not table_data:
-                            table_data.append(row_vals)
-                        else:
-                            # QID matching check
-                            for qid in TARGET_QIDS:
-                                if qid.upper() in row_text:
-                                    found_qids.add(qid.upper())
-                                    if row_vals not in table_data:
-                                        table_data.append(row_vals)
+            page.wait_for_timeout(1200)
 
-                next_btn = page.locator("button[aria-label*='Next'], button:has-text('>'), .v-pagination__next button").first
-                if next_btn.is_visible() and next_btn.is_enabled():
-                    print(f"➡️ Moving to Page {page_num + 1}...")
-                    next_btn.click()
-                    page.wait_for_timeout(3000)
-                    page_num += 1
-                else:
-                    break
+            # Check if new rows were added
+            current_row_count = len(table_data)
+            if current_row_count == previous_row_count:
+                scroll_attempts += 1
+            else:
+                scroll_attempts = 0  # Reset if new rows found
+                previous_row_count = current_row_count
 
         # ----------------------------------------------------------------------
-        # 📋 DIAGNOSTIC PRINT LOG (GitHub Console එකේ බලාගැනීමට)
+        # 📋 FULL DIAGNOSTIC PRINT LOG (GitHub Console එකේ බලාගැනීමට)
         # ----------------------------------------------------------------------
         print("\n==================================================")
         print("📊 --- SCRAPED SUMMARY & PREVIEW LOG ---")
         print("==================================================")
-        print(f"🎯 Total Target QIDs Checked: {len(TARGET_QIDS)}")
-        print(f"✅ Total Matched QIDs Found: {len(found_qids)}")
-        print(f"📌 Found QIDs List: {sorted(list(found_qids))}")
+        print(f"📊 Total Extracted Dynamic Rows (including header): {len(table_data)}")
         
-        missing_qids = set(q.upper() for q in TARGET_QIDS) - found_qids
-        if missing_qids:
-            print(f"⚠️ Missing QIDs on Dashboard ({len(missing_qids)}): {sorted(list(missing_qids))}")
+        # Extracted QAT IDs ටික වෙනම Print කර පෙන්වීම
+        extracted_qids = set()
+        for r in table_data[1:]:
+            if r and len(r) > 0 and r[0].strip().startswith("K"):
+                extracted_qids.add(r[0].strip())
         
-        print(f"\n📊 Total Extracted Rows (including header): {len(table_data)}")
+        print(f"✅ Total Dynamic QAT IDs Found: {len(extracted_qids)}")
+        print(f"📌 Found QIDs List: {sorted(list(extracted_qids))}")
         print("--------------------------------------------------")
+        
+        # පේළියෙන් පේළිය Data මුද්‍රණය කිරීම
         for idx, row in enumerate(table_data):
             print(f"Row {idx+1}: {row}")
         print("==================================================\n")
 
         if not table_data:
-            print("❌ No matching QID rows found on Dashboard!")
+            print("❌ No data rows captured from Dashboard!")
             return
 
         # ----------------------------------------------------------------------
@@ -156,7 +139,7 @@ def main():
 
         worksheet.clear()
         worksheet.update('A1', table_data)
-        print("🎉 SUCCESS: Target QID Data updated to Google Sheet!")
+        print("🎉 SUCCESS: Entire Dashboard Data updated to Google Sheet 'QAT Raw Data'!")
 
 if __name__ == "__main__":
     main()
