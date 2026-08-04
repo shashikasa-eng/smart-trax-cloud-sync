@@ -14,7 +14,7 @@ def main():
     if not all([url, username, password, sheet_name, creds_json]):
         raise Exception("Missing required environment variables in GitHub Secrets!")
 
-    print("🚀 Starting Complete Universal Dashboard Scraper (Full Dynamic Engine)...")
+    print("🚀 Starting Fast & Dynamic SMART Dashboard Scraper...")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -22,7 +22,7 @@ def main():
         page = context.new_page()
 
         print("🔑 Navigating to SMART Dashboard URL...")
-        page.goto(url, wait_until="networkidle", timeout=60000)
+        page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
         # Login Handling
         if "login" in page.url.lower() or page.locator("input[type='password']").count() > 0:
@@ -36,90 +36,65 @@ def main():
 
             page.fill("input[type='password']", password)
             page.keyboard.press("Enter")
-            page.wait_for_timeout(10000)
+            page.wait_for_timeout(8000)
 
-        print("✅ Login completed. Waiting for Dashboard PowerBI/DataGrid elements to populate...")
-        page.wait_for_timeout(12000)
+        print("✅ Login completed. Waiting for Dashboard Grid...")
+        page.wait_for_timeout(8000)
 
         # ----------------------------------------------------------------------
-        # 📜 INNER TABLE VIRTUAL SCROLLING ENGINE (All Rows Capture)
+        # 📜 FAST INNER SCROLLING ENGINE (Strict Time Limit - Max 12 Scrolls)
         # ----------------------------------------------------------------------
-        print("📜 Activating Inner Table Virtual Scrollbar to load ALL QAT Rows...")
+        print("📜 Fast Scrolling PowerBI DataGrid to capture all rows...")
 
         table_data = []
-        
-        # PowerBI / Grid Containers & Tables detection
-        grid_selector = "div[role='grid'], .v-data-table, table, div[class*='scroll']"
         
         # Get Column Headers
         header_cells = page.locator("th, div[role='columnheader']").all()
         if header_cells:
             headers = [h.inner_text().strip().replace('\n', ' ') for h in header_cells if h.inner_text().strip()]
-            if headers and headers not in table_data:
+            if headers:
                 table_data.append(headers)
 
-        # Inner Scroll loop to trigger virtual row rendering
-        scroll_container = page.locator(grid_selector).first
-        
-        previous_row_count = 0
-        scroll_attempts = 0
-        max_attempts = 35  # Continuous inner scrolling
-
-        while scroll_attempts < max_attempts:
-            # Table එකේ පේන සෑම Row එකක්ම Scan කර ගැනීම
+        # Fixed Fast Scroll Loop (තත්පර 15-20 කින් ඉවර වෙනවා)
+        for i in range(12):
             rows = page.locator("tr, div[role='row']").all()
-            
             for row in rows:
                 cells = row.locator("td, th, div[role='gridcell']").all()
                 row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
                 
-                # Non-empty dynamic row validation
                 if any(row_vals) and len(row_vals) > 2:
                     if row_vals not in table_data:
                         table_data.append(row_vals)
 
-            # Inner Container එක පල්ලෙහාට Scroll කිරීම (Mouse Wheel & JavaScript)
-            if scroll_container.is_visible():
-                scroll_container.hover()
-                page.mouse.wheel(0, 1500)
-            else:
-                page.evaluate("window.scrollBy(0, 1000)")
+            # Wheel Scroll Down inside grid
+            page.mouse.wheel(0, 1200)
+            page.wait_for_timeout(600)  # fast delay
 
-            page.wait_for_timeout(1200)
-
-            # Check if new rows were added
-            current_row_count = len(table_data)
-            if current_row_count == previous_row_count:
-                scroll_attempts += 1
-            else:
-                scroll_attempts = 0  # Reset if new rows found
-                previous_row_count = current_row_count
+        print(f"\n📊 TOTAL DYNAMIC ROWS CAPTURED: {len(table_data)}")
 
         # ----------------------------------------------------------------------
-        # 📋 FULL DIAGNOSTIC PRINT LOG (GitHub Console එකේ බලාගැනීමට)
+        # 📋 DIAGNOSTIC PRINT LOG (GitHub Console එකේ බලන්න)
         # ----------------------------------------------------------------------
         print("\n==================================================")
         print("📊 --- SCRAPED SUMMARY & PREVIEW LOG ---")
         print("==================================================")
-        print(f"📊 Total Extracted Dynamic Rows (including header): {len(table_data)}")
+        print(f"📊 Total Extracted Rows (including header): {len(table_data)}")
         
-        # Extracted QAT IDs ටික වෙනම Print කර පෙන්වීම
         extracted_qids = set()
         for r in table_data[1:]:
             if r and len(r) > 0 and r[0].strip().startswith("K"):
                 extracted_qids.add(r[0].strip())
         
-        print(f"✅ Total Dynamic QAT IDs Found: {len(extracted_qids)}")
+        print(f"✅ Total QAT IDs Found: {len(extracted_qids)}")
         print(f"📌 Found QIDs List: {sorted(list(extracted_qids))}")
         print("--------------------------------------------------")
         
-        # පේළියෙන් පේළිය Data මුද්‍රණය කිරීම
         for idx, row in enumerate(table_data):
             print(f"Row {idx+1}: {row}")
         print("==================================================\n")
 
         if not table_data:
-            print("❌ No data rows captured from Dashboard!")
+            print("❌ No data rows captured!")
             return
 
         # ----------------------------------------------------------------------
