@@ -1,36 +1,49 @@
-name: SMART Dashboard 24/7 Cloud Scraper
+name: SMART Trax Cloud Sync Engine
 
+# ---------------------------------------------------------------------------
+# TRIGGERS
+# ---------------------------------------------------------------------------
 on:
-  schedule:
-    # Runs every 5 minutes 24/7 automatically in the cloud
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub UI anytime
+  # ⚡ 1. External Cron Trigger (cron-job.org හරහා තත්පරයෙන් Instant Run වේ)
+  repository_dispatch:
+    types: [qat_task_updated]
 
+  # 🔘 2. GitHub UI එකෙන් Manual Run කිරීම සඳහා
+  workflow_dispatch:
+
+  # ⏱️ 3. Backup Schedule (විනාඩි 5න් 5ට Fallback Trigger)
+  schedule:
+    - cron: '*/5 * * * *'
+
+# ---------------------------------------------------------------------------
+# JOBS CONFIGURATION
+# ---------------------------------------------------------------------------
 jobs:
-  scrape_and_sync:
+  sync-job:
+    name: Execute Scraper & Cloud Sync
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Checkout Code
+      # Step 1: Repository එක Checkout කරගැනීම
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
+      # Step 2: Python Environment එක Setup කිරීම
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-policy: '3.10'
+          python-python-version: '3.x'
 
+      # Step 3: Dependencies Install කරගැනීම
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright gspread oauth2client
-          playwright install chromium
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Execute Scraper
-        env:
-          SMART_URL: ${{ secrets.SMART_URL }}
-          SMART_USERNAME: ${{ secrets.SMART_USERNAME }}
-          SMART_PASSWORD: ${{ secrets.SMART_PASSWORD }}
-          GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
-          SHEET_NAME: ${{ secrets.SHEET_NAME }}
+      # Step 4: ඔයාගේ Main Python Scraper/Sync Script එක Run කිරීම
+      - name: Run Main Scraper Script
         run: |
-          python smart_trax_scraper.py
+          python smart_trax_scraper.py  # 👈 ඔයාගේ Python file එකේ නම 'main.py' නෙවේ නම් ඒ නම මෙතනට දාන්න
+        env:
+          # Secrets / API Keys තියෙනවා නම් මෙතනින් Pass කරන්න පුළුවන්
+          PYTHONUNBUFFERED: "1"
