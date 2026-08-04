@@ -3,7 +3,7 @@ import json
 import logging
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,12 +14,11 @@ logging.basicConfig(
 def get_env_variable(var_name: str) -> str:
     val = os.environ.get(var_name)
     if not val:
-        logging.error(f"❌ Missing environment variable: {var_name}")
         raise ValueError(f"Missing environment variable: {var_name}")
     return val
 
 def main():
-    logging.info("🚀 Starting Universal Smart Dashboard Scraper (DOM Target Engine)...")
+    logging.info("🚀 Starting Ultra-Fast Fast-Inject PowerBI Scraper...")
 
     url = get_env_variable("SMART_URL")
     username = get_env_variable("SMART_USERNAME")
@@ -37,11 +36,11 @@ def main():
 
         try:
             logging.info("🔑 Navigating to SMART Trax Dashboard...")
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
 
-            # Login Handling
+            # Fast Login
             if "login" in page.url.lower() or page.locator("input[type='password']").count() > 0:
-                logging.info("🔐 Logging into SMART Trax Cloud Portal...")
+                logging.info("🔐 Logging in...")
                 if page.locator("input[type='email']").count() > 0:
                     page.fill("input[type='email']", username)
                 elif page.locator("input[name='username']").count() > 0:
@@ -51,71 +50,69 @@ def main():
 
                 page.fill("input[type='password']", password)
                 page.keyboard.press("Enter")
-                page.wait_for_timeout(10000)
+                page.wait_for_timeout(7000)
 
-            logging.info("✅ Login successful. Waiting for Dashboard Visuals to load...")
-            page.wait_for_timeout(12000)
+            logging.info("✅ Login Done. Waiting for visual grid...")
+            page.wait_for_timeout(8000)
 
             # ----------------------------------------------------------------------
-            # 📜 UNIVERSAL DOM EXTRACTION ENGINE WITH JS SCROLL
+            # ⚡ ULTRA-FAST DIRECT JAVASCRIPT TABLE EXTRACTION ENGINE
             # ----------------------------------------------------------------------
-            table_data = []
+            logging.info("⚡ Executing In-Memory JavaScript DOM Scraper & Fast Scroll...")
+
             extracted_rows_dict = {}
 
-            # Step 1: Capture Headers
-            header_cells = page.locator("th, div[role='columnheader']").all()
-            headers = []
-            if header_cells:
-                headers = [h.inner_text().strip().replace('\n', ' ') for h in header_cells if h.inner_text().strip()]
-            
-            if not headers:
-                # Default Headers if PowerBI hides header elements
-                headers = ["QAT ID", "QAT Name", "Project", "Trax Category G1", "Trax Category G2", "Task Type", "Task ID", "Task Duration", "QAT Status", "Status Duration", "Last Login Time", "Start Shift Time"]
-
-            table_data.append(headers)
-
-            # Step 2: Multi-Pass JS Scroll & Element Scan
-            logging.info("📜 Scanning Dashboard Elements and Scrolling Inner Containers...")
-
-            for pass_num in range(15):
-                # JS Injection to force scroll all scrollable elements
-                page.evaluate("""
+            # Fast 10-Step JS Inner Scroll & Data Collector
+            for step in range(10):
+                # JS Script: Read all visible rows directly from DOM/iFrames
+                raw_extracted_rows = page.evaluate("""
                     () => {
-                        const containers = document.querySelectorAll('div, section, main, iframe');
-                        containers.forEach(c => {
-                            if (c.scrollHeight > c.clientHeight) {
-                                c.scrollTop += 700;
+                        const results = [];
+                        // Search all elements matching rows or table rows across main DOM & frames
+                        const rowElements = document.querySelectorAll('tr, div[role="row"]');
+                        
+                        rowElements.forEach(row => {
+                            const cells = row.querySelectorAll('td, th, div[role="gridcell"]');
+                            const cellVals = Array.from(cells).map(c => c.innerText.trim().replace(/\\n/g, ' ')).filter(v => v !== '');
+                            if (cellVals.length > 1) {
+                                results.push(cellVals);
                             }
                         });
-                        window.scrollBy(0, 700);
+
+                        // Scroll all containers down
+                        const containers = document.querySelectorAll('div, section, main');
+                        containers.forEach(c => {
+                            if (c.scrollHeight > c.clientHeight) {
+                                c.scrollTop += 900;
+                            }
+                        });
+                        window.scrollBy(0, 900);
+
+                        return results;
                     }
                 """)
-                page.wait_for_timeout(1200)
 
-                # Scan all rows in DOM
-                rows = page.locator("tr, div[role='row'], div[class*='row']").all()
-                for r in rows:
-                    try:
-                        cells = r.locator("td, th, div[role='gridcell'], div[class*='cell']").all()
-                        row_vals = [c.inner_text().strip().replace('\n', ' ') for c in cells if c.inner_text().strip() != ""]
+                # Clean & Store Unique Rows
+                for row_vals in raw_extracted_rows:
+                    if row_vals and len(row_vals) >= 2:
+                        first_col = str(row_vals[0]).strip().upper()
+                        # Pick rows starting with K or Headers
+                        if first_col.startswith("K") or "QAT" in first_col:
+                            unique_key = " | ".join(row_vals[:4])
+                            if unique_key not in extracted_rows_dict:
+                                extracted_rows_dict[unique_key] = row_vals
 
-                        # Check if row has data and contains a valid QAT ID (Starts with K or k)
-                        if row_vals and len(row_vals) >= 2:
-                            first_col = row_vals[0].upper()
-                            if first_col.startswith("K"):
-                                # Unique Key combination (QAT ID + Task ID if present) to avoid duplicates
-                                unique_key = " | ".join(row_vals[:3])
-                                if unique_key not in extracted_rows_dict:
-                                    extracted_rows_dict[unique_key] = row_vals
-                    except Exception:
-                        continue
+                page.wait_for_timeout(800)
 
-            # Append all cleaned unique rows
-            for row in extracted_rows_dict.values():
-                table_data.append(row)
+            table_data = list(extracted_rows_dict.values())
+
+            # Header Fallback
+            if not table_data or not any("QAT" in str(cell).upper() for cell in table_data[0]):
+                headers = ["QAT ID", "QAT Name", "Project", "Trax Category G1", "Trax Category G2", "Task Type", "Task ID", "Task Duration", "QAT Status", "Status Duration", "Last Login Time", "Start Shift Time"]
+                table_data.insert(0, headers)
 
             # ----------------------------------------------------------------------
-            # 📋 DIAGNOSTIC LOG ENGINE
+            # 📋 ENTERPRISE DIAGNOSTIC PRINT LOG
             # ----------------------------------------------------------------------
             print("\n==================================================")
             print("📊 --- COMPLETE DASHBOARD SCRAPED LOG ---")
@@ -123,9 +120,9 @@ def main():
             print(f"📊 Total Extracted Dynamic Rows (including headers): {len(table_data)}")
 
             extracted_qids = set()
-            for r in table_data[1:]:
-                if r and len(r) > 0 and r[0].strip().upper().startswith("K"):
-                    extracted_qids.add(r[0].strip().upper())
+            for r in table_data:
+                if r and len(r) > 0 and str(r[0]).strip().upper().startswith("K"):
+                    extracted_qids.add(str(r[0]).strip().upper())
 
             print(f"✅ Total Unique QAT IDs Captured: {len(extracted_qids)}")
             print(f"📌 Found QIDs List: {sorted(list(extracted_qids))}")
@@ -136,13 +133,13 @@ def main():
             print("==================================================\n")
 
             if len(table_data) <= 1:
-                logging.error("❌ Extraction Failed: No data rows captured from Dashboard!")
+                logging.error("❌ Extraction Failed: No rows captured!")
                 return
 
             # ----------------------------------------------------------------------
             # 🔄 GOOGLE SHEETS PIPELINE
             # ----------------------------------------------------------------------
-            logging.info("🔄 Syncing Extracted Data to Google Sheets API...")
+            logging.info("🔄 Syncing Extracted Data to Google Sheets...")
             creds_dict = json.loads(creds_json)
             scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -158,11 +155,8 @@ def main():
             worksheet.update('A1', table_data)
             logging.info("🎉 SUCCESS: Entire PowerBI Dashboard Data updated to Google Sheet!")
 
-        except PlaywrightTimeoutError as e:
-            logging.error(f"❌ Timeout Exception: {e}")
-            raise e
         except Exception as ex:
-            logging.error(f"❌ Unexpected Error: {ex}")
+            logging.error(f"❌ Error during execution: {ex}")
             raise ex
         finally:
             browser.close()
