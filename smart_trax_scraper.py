@@ -53,7 +53,6 @@ def main():
                 if dd.is_visible():
                     dd.click()
                     page.wait_for_timeout(1000)
-                    # Option All or 100
                     max_option = page.locator("option, .v-list-item").last
                     if max_option.is_visible():
                         max_option.click()
@@ -74,7 +73,7 @@ def main():
         page.wait_for_timeout(1000)
 
         # ----------------------------------------------------------------------
-        # 📸 DEBUG SCREENSHOT (Web Page එකේ පෙනෙන දේ බලාගැනීමට)
+        # 📸 DEBUG SCREENSHOT (Web Page එකේ පෙනෙන දේ capture කිරීම)
         # ----------------------------------------------------------------------
         page.screenshot(path="smart_dashboard_view.png", full_page=True)
         print("📸 Dashboard View Screenshot captured!")
@@ -88,7 +87,7 @@ def main():
         while True:
             print(f"🔍 Extracting Table Data from Page {page_count}...")
             
-            # Find visible tables
+            # Visible tables සෙවීම
             tables = page.locator("table:visible").all()
             best_table_rows = []
 
@@ -104,12 +103,11 @@ def main():
                     cells = row.locator("th, td").all()
                     row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
                     if any(row_vals):
-                        # Avoid duplicating headers across pages
                         if not table_data or row_vals != table_data[0]:
                             if row_vals not in table_data:
                                 table_data.append(row_vals)
 
-            # Fallback for Div-based Data Grids
+            # Div-based Data Grids Fallback
             if not table_data:
                 grid_rows = page.locator("div[role='row']:visible, .v-data-table tr:visible").all()
                 for row in grid_rows:
@@ -118,7 +116,7 @@ def main():
                     if any(row_vals) and row_vals not in table_data:
                         table_data.append(row_vals)
 
-            # ➡️ Check for Next Page Button
+            # ➡️ Next Page Button එක තිබේ නම් Click කිරීම
             next_btn = page.locator("button[aria-label*='Next'], button:has-text('>'), .v-pagination__next button, li.next:not(.disabled) a").first
             
             if next_btn.is_visible() and next_btn.is_enabled():
@@ -131,6 +129,14 @@ def main():
                 break
 
         print(f"📊 Total Rows Extracted across all pages: {len(table_data)}")
+
+        # ----------------------------------------------------------------------
+        # 📋 DIAGNOSTIC PRINT LOG (GitHub Console එකේ Scraped Data බලාගැනීමට)
+        # ----------------------------------------------------------------------
+        print("\n--- 📋 SCRAPED DATA PREVIEW ---")
+        for idx, row in enumerate(table_data):
+            print(f"Row {idx+1}: {row}")
+        print("-----------------------------------\n")
 
         if not table_data:
             print("❌ No table data found on the dashboard page!")
