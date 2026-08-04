@@ -19,7 +19,7 @@ def get_env_variable(var_name: str) -> str:
     return val
 
 def main():
-    logging.info("🚀 Starting PowerBI Ultra-Precision Keyboard & Grid Focused Scraper...")
+    logging.info("🚀 Starting Universal Smart Dashboard Scraper (DOM Target Engine)...")
 
     url = get_env_variable("SMART_URL")
     username = get_env_variable("SMART_USERNAME")
@@ -53,55 +53,69 @@ def main():
                 page.keyboard.press("Enter")
                 page.wait_for_timeout(10000)
 
-            logging.info("✅ Login successful. Waiting for PowerBI Table to render...")
+            logging.info("✅ Login successful. Waiting for Dashboard Visuals to load...")
             page.wait_for_timeout(12000)
 
             # ----------------------------------------------------------------------
-            # 📜 POWERBI KEYBOARD & GRID SCROLLING ENGINE
+            # 📜 UNIVERSAL DOM EXTRACTION ENGINE WITH JS SCROLL
             # ----------------------------------------------------------------------
             table_data = []
-            seen_rows = set()
+            extracted_rows_dict = {}
 
-            # 1. Extract Column Headers
+            # Step 1: Capture Headers
             header_cells = page.locator("th, div[role='columnheader']").all()
+            headers = []
             if header_cells:
                 headers = [h.inner_text().strip().replace('\n', ' ') for h in header_cells if h.inner_text().strip()]
-                if headers:
-                    table_data.append(headers)
+            
+            if not headers:
+                # Default Headers if PowerBI hides header elements
+                headers = ["QAT ID", "QAT Name", "Project", "Trax Category G1", "Trax Category G2", "Task Type", "Task ID", "Task Duration", "QAT Status", "Status Duration", "Last Login Time", "Start Shift Time"]
 
-            # 2. Focus on PowerBI Table Grid
-            grid_element = page.locator("div[role='grid'], table, .v-data-table").first
-            if grid_element.is_visible():
-                grid_element.click()
-                page.wait_for_timeout(1000)
+            table_data.append(headers)
 
-            # 3. Step-by-Step Deep Keyboard Scrolling
-            logging.info("📜 Executing Key-Press Scrolling to reach the very bottom (including K20896 & beyond)...")
+            # Step 2: Multi-Pass JS Scroll & Element Scan
+            logging.info("📜 Scanning Dashboard Elements and Scrolling Inner Containers...")
 
-            for scroll_step in range(25):
-                # Fetch currently rendered rows
-                rows = page.locator("tr, div[role='row']").all()
-                for row in rows:
-                    cells = row.locator("td, th, div[role='gridcell']").all()
-                    row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
+            for pass_num in range(15):
+                # JS Injection to force scroll all scrollable elements
+                page.evaluate("""
+                    () => {
+                        const containers = document.querySelectorAll('div, section, main, iframe');
+                        containers.forEach(c => {
+                            if (c.scrollHeight > c.clientHeight) {
+                                c.scrollTop += 700;
+                            }
+                        });
+                        window.scrollBy(0, 700);
+                    }
+                """)
+                page.wait_for_timeout(1200)
 
-                    if any(row_vals) and len(row_vals) > 2:
-                        # Row unique identifier to prevent exact duplicates
-                        row_key = " | ".join(row_vals)
-                        if row_key not in seen_rows:
-                            seen_rows.add(row_key)
-                            table_data.append(row_vals)
+                # Scan all rows in DOM
+                rows = page.locator("tr, div[role='row'], div[class*='row']").all()
+                for r in rows:
+                    try:
+                        cells = r.locator("td, th, div[role='gridcell'], div[class*='cell']").all()
+                        row_vals = [c.inner_text().strip().replace('\n', ' ') for c in cells if c.inner_text().strip() != ""]
 
-                # Simulate Keyboard PageDown and ArrowDown to force PowerBI DOM update
-                page.keyboard.press("PageDown")
-                page.wait_for_timeout(800)
-                
-                # Mouse Wheel Fallback inside container
-                page.mouse.wheel(0, 1000)
-                page.wait_for_timeout(500)
+                        # Check if row has data and contains a valid QAT ID (Starts with K or k)
+                        if row_vals and len(row_vals) >= 2:
+                            first_col = row_vals[0].upper()
+                            if first_col.startswith("K"):
+                                # Unique Key combination (QAT ID + Task ID if present) to avoid duplicates
+                                unique_key = " | ".join(row_vals[:3])
+                                if unique_key not in extracted_rows_dict:
+                                    extracted_rows_dict[unique_key] = row_vals
+                    except Exception:
+                        continue
+
+            # Append all cleaned unique rows
+            for row in extracted_rows_dict.values():
+                table_data.append(row)
 
             # ----------------------------------------------------------------------
-            # 📋 ENTERPRISE DIAGNOSTIC LOG ENGINE
+            # 📋 DIAGNOSTIC LOG ENGINE
             # ----------------------------------------------------------------------
             print("\n==================================================")
             print("📊 --- COMPLETE DASHBOARD SCRAPED LOG ---")
@@ -110,7 +124,7 @@ def main():
 
             extracted_qids = set()
             for r in table_data[1:]:
-                if r and len(r) > 0 and (r[0].strip().startswith("K") or r[0].strip().startswith("k")):
+                if r and len(r) > 0 and r[0].strip().upper().startswith("K"):
                     extracted_qids.add(r[0].strip().upper())
 
             print(f"✅ Total Unique QAT IDs Captured: {len(extracted_qids)}")
@@ -121,7 +135,7 @@ def main():
                 print(f"Row {idx+1}: {row}")
             print("==================================================\n")
 
-            if not table_data:
+            if len(table_data) <= 1:
                 logging.error("❌ Extraction Failed: No data rows captured from Dashboard!")
                 return
 
