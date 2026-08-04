@@ -18,7 +18,7 @@ def get_env_variable(var_name: str) -> str:
     return val
 
 def main():
-    logging.info("🚀 Starting Ultra-Fast Fast-Inject PowerBI Scraper...")
+    logging.info("🚀 Starting Smart Grouped Dashboard Scraper...")
 
     url = get_env_variable("SMART_URL")
     username = get_env_variable("SMART_USERNAME")
@@ -56,30 +56,26 @@ def main():
             page.wait_for_timeout(8000)
 
             # ----------------------------------------------------------------------
-            # ⚡ ULTRA-FAST DIRECT JAVASCRIPT TABLE EXTRACTION ENGINE
+            # ⚡ FAST DOM EXTRACTION & INNER SCROLLING
             # ----------------------------------------------------------------------
-            logging.info("⚡ Executing In-Memory JavaScript DOM Scraper & Fast Scroll...")
+            logging.info("⚡ Capturing all raw rows from Dashboard...")
 
-            extracted_rows_dict = {}
+            raw_rows_list = []
 
-            # Fast 10-Step JS Inner Scroll & Data Collector
-            for step in range(10):
-                # JS Script: Read all visible rows directly from DOM/iFrames
+            for step in range(12):
                 raw_extracted_rows = page.evaluate("""
                     () => {
                         const results = [];
-                        // Search all elements matching rows or table rows across main DOM & frames
                         const rowElements = document.querySelectorAll('tr, div[role="row"]');
                         
                         rowElements.forEach(row => {
                             const cells = row.querySelectorAll('td, th, div[role="gridcell"]');
-                            const cellVals = Array.from(cells).map(c => c.innerText.trim().replace(/\\n/g, ' ')).filter(v => v !== '');
-                            if (cellVals.length > 1) {
+                            const cellVals = Array.from(cells).map(c => c.innerText.trim().replace(/\\n/g, ' '));
+                            if (cellVals.length > 1 && cellVals.some(v => v !== '')) {
                                 results.push(cellVals);
                             }
                         });
 
-                        // Scroll all containers down
                         const containers = document.querySelectorAll('div, section, main');
                         containers.forEach(c => {
                             if (c.scrollHeight > c.clientHeight) {
@@ -92,54 +88,107 @@ def main():
                     }
                 """)
 
-                # Clean & Store Unique Rows
                 for row_vals in raw_extracted_rows:
                     if row_vals and len(row_vals) >= 2:
                         first_col = str(row_vals[0]).strip().upper()
-                        # Pick rows starting with K or Headers
-                        if first_col.startswith("K") or "QAT" in first_col:
-                            unique_key = " | ".join(row_vals[:4])
-                            if unique_key not in extracted_rows_dict:
-                                extracted_rows_dict[unique_key] = row_vals
+                        if first_col.startswith("K"):
+                            raw_rows_list.append(row_vals)
 
                 page.wait_for_timeout(800)
 
-            table_data = list(extracted_rows_dict.values())
+            # ----------------------------------------------------------------------
+            # 🧠 SMART GROUPING LOGIC (Group Multiple Tasks per QAT ID)
+            # ----------------------------------------------------------------------
+            logging.info("🧠 Processing Multi-Task Grouping per QAT ID...")
 
-            # Header Fallback
-            if not table_data or not any("QAT" in str(cell).upper() for cell in table_data[0]):
-                headers = ["QAT ID", "QAT Name", "Project", "Trax Category G1", "Trax Category G2", "Task Type", "Task ID", "Task Duration", "QAT Status", "Status Duration", "Last Login Time", "Start Shift Time"]
-                table_data.insert(0, headers)
+            grouped_qat_data = {}
+
+            for r in raw_rows_list:
+                qid = str(r[0]).strip().upper()
+                name = r[1] if len(r) > 1 else ""
+                project = r[2] if len(r) > 2 else ""
+                cat1 = r[3] if len(r) > 3 else ""
+                cat2 = r[4] if len(r) > 4 else ""
+                task_type = r[5] if len(r) > 5 else ""
+                task_id = r[6] if len(r) > 6 else ""
+                task_dur = r[7] if len(r) > 7 else ""
+                status = r[8] if len(r) > 8 else ""
+                status_dur = r[9] if len(r) > 9 else ""
+                last_login = r[10] if len(r) > 10 else ""
+                start_shift = r[11] if len(r) > 11 else ""
+
+                if qid not in grouped_qat_data:
+                    grouped_qat_data[qid] = {
+                        "QAT ID": qid,
+                        "QAT Name": name,
+                        "Project": set(),
+                        "Trax Category Group Id": set(),
+                        "Trax Category Group Name": set(),
+                        "Task Type": set(),
+                        "Task ID": set(),
+                        "Task Duration": set(),
+                        "QAT Status": status,
+                        "Status Duration": status_dur,
+                        "Last Login Time": last_login,
+                        "Start Shift Time": start_shift
+                    }
+
+                # Set එකකට එකතු කරන්නේ Duplicates නැති කර තනි Record එකක් ලෙස සෑදීමටයි
+                if project: grouped_qat_data[qid]["Project"].add(project)
+                if cat1: grouped_qat_data[qid]["Trax Category Group Id"].add(cat1)
+                if cat2: grouped_qat_data[qid]["Trax Category Group Name"].add(cat2)
+                if task_type: grouped_qat_data[qid]["Task Type"].add(task_type)
+                if task_id: grouped_qat_data[qid]["Task ID"].add(task_id)
+                if task_dur: grouped_qat_data[qid]["Task Duration"].add(task_dur)
+                
+                # Active/Latest status එක update කිරීම
+                if status: grouped_qat_data[qid]["QAT Status"] = status
+                if status_dur: grouped_qat_data[qid]["Status Duration"] = status_dur
 
             # ----------------------------------------------------------------------
-            # 📋 ENTERPRISE DIAGNOSTIC PRINT LOG
+            # 📊 FORMULATE FINAL CLEAN TABLE DATA
+            # ----------------------------------------------------------------------
+            headers = ["QAT ID", "QAT Name", "Project", "Trax Category Group Id", "Trax Category Group Name", "Task Type", "Task ID", "Task Duration", "QAT Status", "Status Duration", "Last Login Time", "Start Shift Time"]
+            final_table_data = [headers]
+
+            for qid, data in grouped_qat_data.items():
+                row = [
+                    data["QAT ID"],
+                    data["QAT Name"],
+                    ", ".join(sorted(list(data["Project"]))),
+                    ", ".join(sorted(list(data["Trax Category Group Id"]))),
+                    ", ".join(sorted(list(data["Trax Category Group Name"]))),
+                    ", ".join(sorted(list(data["Task Type"]))),
+                    ", ".join(sorted(list(data["Task ID"]))),
+                    ", ".join(sorted(list(data["Task Duration"]))),
+                    data["QAT Status"],
+                    data["Status Duration"],
+                    data["Last Login Time"],
+                    data["Start Shift Time"]
+                ]
+                final_table_data.append(row)
+
+            # ----------------------------------------------------------------------
+            # 📋 DIAGNOSTIC LOG ENGINE
             # ----------------------------------------------------------------------
             print("\n==================================================")
-            print("📊 --- COMPLETE DASHBOARD SCRAPED LOG ---")
+            print("📊 --- CLEAN GROUPED DASHBOARD SCRAPED LOG ---")
             print("==================================================")
-            print(f"📊 Total Extracted Dynamic Rows (including headers): {len(table_data)}")
-
-            extracted_qids = set()
-            for r in table_data:
-                if r and len(r) > 0 and str(r[0]).strip().upper().startswith("K"):
-                    extracted_qids.add(str(r[0]).strip().upper())
-
-            print(f"✅ Total Unique QAT IDs Captured: {len(extracted_qids)}")
-            print(f"📌 Found QIDs List: {sorted(list(extracted_qids))}")
+            print(f"📊 Total Dynamic Unique QAT Profiles: {len(final_table_data) - 1}")
             print("--------------------------------------------------")
 
-            for idx, row in enumerate(table_data):
+            for idx, row in enumerate(final_table_data):
                 print(f"Row {idx+1}: {row}")
             print("==================================================\n")
 
-            if len(table_data) <= 1:
-                logging.error("❌ Extraction Failed: No rows captured!")
+            if len(final_table_data) <= 1:
+                logging.error("❌ Extraction Failed: No data captured!")
                 return
 
             # ----------------------------------------------------------------------
             # 🔄 GOOGLE SHEETS PIPELINE
             # ----------------------------------------------------------------------
-            logging.info("🔄 Syncing Extracted Data to Google Sheets...")
+            logging.info("🔄 Syncing Clean Grouped Data to Google Sheets...")
             creds_dict = json.loads(creds_json)
             scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -152,8 +201,8 @@ def main():
                 worksheet = spreadsheet.get_worksheet(0)
 
             worksheet.clear()
-            worksheet.update('A1', table_data)
-            logging.info("🎉 SUCCESS: Entire PowerBI Dashboard Data updated to Google Sheet!")
+            worksheet.update('A1', final_table_data)
+            logging.info("🎉 SUCCESS: Clean grouped dashboard updated to Google Sheet!")
 
         except Exception as ex:
             logging.error(f"❌ Error during execution: {ex}")
