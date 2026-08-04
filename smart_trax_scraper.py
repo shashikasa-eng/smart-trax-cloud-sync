@@ -5,7 +5,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-# Configure Enterprise-grade Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -13,17 +12,15 @@ logging.basicConfig(
 )
 
 def get_env_variable(var_name: str) -> str:
-    """Retrieve environment variables safely."""
     val = os.environ.get(var_name)
     if not val:
-        logging.error(f"❌ Critical Error: Missing required environment variable '{var_name}'")
-        raise ValueError(f"Missing required environment variable: {var_name}")
+        logging.error(f"❌ Missing environment variable: {var_name}")
+        raise ValueError(f"Missing environment variable: {var_name}")
     return val
 
 def main():
-    logging.info("🚀 Initializing Production Scraper Engine v4.0 (JS-Injected Virtual DOM Engine)...")
+    logging.info("🚀 Starting PowerBI Ultra-Precision Keyboard & Grid Focused Scraper...")
 
-    # Load and validate environment variables
     url = get_env_variable("SMART_URL")
     username = get_env_variable("SMART_USERNAME")
     password = get_env_variable("SMART_PASSWORD")
@@ -42,11 +39,9 @@ def main():
             logging.info("🔑 Navigating to SMART Trax Dashboard...")
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-            # Authentication Handling Engine
+            # Login Handling
             if "login" in page.url.lower() or page.locator("input[type='password']").count() > 0:
                 logging.info("🔐 Logging into SMART Trax Cloud Portal...")
-                
-                # Email/Username Field Auto-Detection
                 if page.locator("input[type='email']").count() > 0:
                     page.fill("input[type='email']", username)
                 elif page.locator("input[name='username']").count() > 0:
@@ -58,52 +53,55 @@ def main():
                 page.keyboard.press("Enter")
                 page.wait_for_timeout(10000)
 
-            logging.info("✅ Authentication Successful. Waiting for PowerBI / DataGrid render...")
-            page.wait_for_timeout(10000)
+            logging.info("✅ Login successful. Waiting for PowerBI Table to render...")
+            page.wait_for_timeout(12000)
 
             # ----------------------------------------------------------------------
-            # 📜 ADVANCED VIRTUAL DOM INNER SCROLLING ENGINE
+            # 📜 POWERBI KEYBOARD & GRID SCROLLING ENGINE
             # ----------------------------------------------------------------------
-            logging.info("📜 Executing Deep JavaScript DOM Scroll Trigger...")
-
             table_data = []
+            seen_rows = set()
 
-            # Extract Column Headers
+            # 1. Extract Column Headers
             header_cells = page.locator("th, div[role='columnheader']").all()
             if header_cells:
                 headers = [h.inner_text().strip().replace('\n', ' ') for h in header_cells if h.inner_text().strip()]
                 if headers:
                     table_data.append(headers)
 
-            # Iterative Multi-Level DOM Scroll
-            for step in range(20):
-                # JS Injection to force scroll all inner scrollable containers
-                page.evaluate("""
-                    () => {
-                        const scrollables = document.querySelectorAll('div, section, main, table, [role="grid"]');
-                        scrollables.forEach(el => {
-                            if (el.scrollHeight > el.clientHeight) {
-                                el.scrollTop += 800;
-                            }
-                        });
-                        window.scrollBy(0, 800);
-                    }
-                """)
+            # 2. Focus on PowerBI Table Grid
+            grid_element = page.locator("div[role='grid'], table, .v-data-table").first
+            if grid_element.is_visible():
+                grid_element.click()
                 page.wait_for_timeout(1000)
 
-                # Capture currently visible grid cells/rows
+            # 3. Step-by-Step Deep Keyboard Scrolling
+            logging.info("📜 Executing Key-Press Scrolling to reach the very bottom (including K20896 & beyond)...")
+
+            for scroll_step in range(25):
+                # Fetch currently rendered rows
                 rows = page.locator("tr, div[role='row']").all()
                 for row in rows:
                     cells = row.locator("td, th, div[role='gridcell']").all()
                     row_vals = [cell.inner_text().strip().replace('\n', ' ') for cell in cells]
 
-                    # Row validation & De-duplication
                     if any(row_vals) and len(row_vals) > 2:
-                        if row_vals not in table_data:
+                        # Row unique identifier to prevent exact duplicates
+                        row_key = " | ".join(row_vals)
+                        if row_key not in seen_rows:
+                            seen_rows.add(row_key)
                             table_data.append(row_vals)
 
+                # Simulate Keyboard PageDown and ArrowDown to force PowerBI DOM update
+                page.keyboard.press("PageDown")
+                page.wait_for_timeout(800)
+                
+                # Mouse Wheel Fallback inside container
+                page.mouse.wheel(0, 1000)
+                page.wait_for_timeout(500)
+
             # ----------------------------------------------------------------------
-            # 📋 ENTERPRISE DIAGNOSTIC PRINT LOG ENGINE
+            # 📋 ENTERPRISE DIAGNOSTIC LOG ENGINE
             # ----------------------------------------------------------------------
             print("\n==================================================")
             print("📊 --- COMPLETE DASHBOARD SCRAPED LOG ---")
@@ -112,10 +110,10 @@ def main():
 
             extracted_qids = set()
             for r in table_data[1:]:
-                if r and len(r) > 0 and r[0].strip().startswith("K"):
-                    extracted_qids.add(r[0].strip())
+                if r and len(r) > 0 and (r[0].strip().startswith("K") or r[0].strip().startswith("k")):
+                    extracted_qids.add(r[0].strip().upper())
 
-            print(f"✅ Total Dynamic QAT IDs Captured: {len(extracted_qids)}")
+            print(f"✅ Total Unique QAT IDs Captured: {len(extracted_qids)}")
             print(f"📌 Found QIDs List: {sorted(list(extracted_qids))}")
             print("--------------------------------------------------")
 
@@ -144,13 +142,13 @@ def main():
 
             worksheet.clear()
             worksheet.update('A1', table_data)
-            logging.info("🎉 SUCCESS: Company Project Scraper completed successfully!")
+            logging.info("🎉 SUCCESS: Entire PowerBI Dashboard Data updated to Google Sheet!")
 
         except PlaywrightTimeoutError as e:
-            logging.error(f"❌ Timeout Exception during Scraper execution: {e}")
+            logging.error(f"❌ Timeout Exception: {e}")
             raise e
         except Exception as ex:
-            logging.error(f"❌ Unexpected Error occurred: {ex}")
+            logging.error(f"❌ Unexpected Error: {ex}")
             raise ex
         finally:
             browser.close()
